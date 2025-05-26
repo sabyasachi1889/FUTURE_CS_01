@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Security Testing Demo - SQLi, XSS, Authentication Flaws</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #333;
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      color: #fff;
+      margin-bottom: 1rem;
+      text-align: center;
+      text-shadow: 0 0 5px rgba(0,0,0,0.5);
+    }
+    section {
+      background: #f9f9f9;
+      border-radius: 8px;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+      padding: 20px;
+      margin: 15px 0;
+      width: 90%;
+      max-width: 700px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+    input[type="text"],
+    input[type="password"],
+    textarea {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      box-sizing: border-box;
+      resize: vertical;
+      font-family: monospace;
+    }
+    button {
+      background-color: #667eea;
+      border: none;
+      color: white;
+      padding: 10px 18px;
+      font-size: 1rem;
+      font-weight: bold;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #5a67d8;
+    }
+    .output {
+      background: #222;
+      color: #0f0;
+      font-family: monospace;
+      font-size: 0.9rem;
+      padding: 10px;
+      border-radius: 4px;
+      max-height: 120px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      margin-top: 10px;
+      box-shadow: inset 0 0 8px #0f0;
+    }
+    .alert {
+      color: red;
+      font-weight: bold;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Security Testing Demo</h1>
+
+  <!-- Section 1: Simulated SQL Injection Vulnerable Search -->
+  <section>
+    <h2>1. Search (Simulated SQL Injection Vulnerable)</h2>
+    <label for="searchQuery">Search Users by Name:</label>
+    <input type="text" id="searchQuery" placeholder="Enter name to search" />
+    <button id="searchBtn">Search</button>
+    <div id="searchResult" class="output"></div>
+    <button id="testSqlInjectionBtn">Test for SQL Injection Vulnerability</button>
+    <div id="sqliTestResult" class="output"></div>
+    <p><small><em>Note: This demo simulates vulnerable behavior by naive string matching without sanitization.</em></small></p>
+  </section>
+
+  <!-- Section 2: Stored XSS Vulnerability -->
+  <section>
+    <h2>2. Comments (Stored Cross-Site Scripting Vulnerable)</h2>
+    <label for="commentInput">Enter a comment:</label>
+    <textarea id="commentInput" rows="3" placeholder="Type your comment here..."></textarea>
+    <button id="postCommentBtn">Post Comment</button>
+    <div id="commentsArea" style="border:1px solid #ccc; border-radius:4px; padding:10px; max-height:150px; overflow-y:auto; background:#fff;"></div>
+    <button id="testXssBtn">Test for Stored XSS Vulnerability</button>
+    <div id="xssTestResult" class="output"></div>
+    <p><small><em>Note: Comments are displayed without sanitization, allowing script execution.</em></small></p>
+  </section>
+
+  <!-- Section 3: Authentication Flaws -->
+  <section>
+    <h2>3. Login (Authentication Flaws Demo)</h2>
+    <label for="usernameInput">Username:</label>
+    <input type="text" id="usernameInput" placeholder="Username" />
+    <label for="passwordInput">Password:</label>
+    <input type="password" id="passwordInput" placeholder="Password" />
+    <button id="loginBtn">Login</button>
+    <div id="loginStatus" class="alert"></div>
+    <button id="testAuthBtn">Test for Authentication Flaw</button>
+    <div id="authTestResult" class="output"></div>
+    <p><small><em>Note: No account lockout and a hardcoded weak password are used for demonstration.</em></small></p>
+  </section>
+
+<script>
+  // === Data for simulating search database ===
+  const usersDB = [
+    { id: 1, name: 'Alice', email: 'alice@example.com' },
+    { id: 2, name: 'Bob', email: 'bob@example.com' },
+    { id: 3, name: 'Charlie', email: 'charlie@example.com' },
+  ];
+
+  // === Section 1: Vulnerable Search Simulation ===
+  const searchBtn = document.getElementById('searchBtn');
+  const searchQueryInput = document.getElementById('searchQuery');
+  const searchResult = document.getElementById('searchResult');
+  const testSqlInjectionBtn = document.getElementById('testSqlInjectionBtn');
+  const sqliTestResult = document.getElementById('sqliTestResult');
+
+  function vulnerableSearch(query) {
+    // Simulate a naive SQL WHERE clause vulnerable to injection
+    // We simulate by running JS includes(), but in a real SQL backend this could be exploited.
+    // Vulnerability: no input sanitization, treats input as raw query.
+    let sqlQuery = `SELECT * FROM users WHERE name = '${query}'`;
+    console.log("Executing query:", sqlQuery);
+
+    // Simulate injection: if query contains "' OR '1'='1" return all users.
+    if (query.includes("' OR '1'='1")) {
+      return usersDB; // Leak all users
+    }
+
+    return usersDB.filter(user => user.name.toLowerCase() === query.toLowerCase());
+  }
+
+  searchBtn.addEventListener('click', () => {
+    const query = searchQueryInput.value.trim();
+    if (!query) {
+      searchResult.textContent = "Please enter a search query.";
+      return;
+    }
+    const results = vulnerableSearch(query);
+    if (results.length > 0) {
+      searchResult.textContent = results.map(u => `ID:${u.id} Name:${u.name} Email:${u.email}`).join('\n');
+    } else {
+      searchResult.textContent = 'No users found.';
+    }
+  });
+
+  // Test SQL Injection
+  testSqlInjectionBtn.addEventListener('click', () => {
+    sqliTestResult.textContent = 'Running SQL Injection Tests...';
+    // Test payloads
+    const testPayloads = [
+      "' OR '1'='1",
+      "' UNION SELECT username, password FROM users--",
+      "' AND 1=CONVERT(int, (SELECT 1))--",
+      "' OR IF(1=1, SLEEP(5), 0)--"
+    ];
+
+    let vulnerable = false;
+    let log = '';
+
+    // Test if payload returns more results than normal
+    const normalResults = vulnerableSearch('Alice').length;
+
+    for (const payload of testPayloads) {
+      const res = vulnerableSearch(payload);
+      log += `Payload: ${payload}\nResults count: ${res.length}\nResults: ${res.map(u => u.name).join(', ')}\n\n`;
+      if (res.length > normalResults) {
+        vulnerable = true;
+        log += '=> Detected possible SQL Injection vulnerability!\n\n';
+        break;
+      }
+    }
+    if (!vulnerable) {
+      log += 'No SQL Injection vulnerability detected with tested payloads.';
+    }
+    sqliTestResult.textContent = log;
+  });
+
+
+  // === Section 2: Stored XSS Demo ===
+  const commentInput = document.getElementById('commentInput');
+  const postCommentBtn = document.getElementById('postCommentBtn');
+  const commentsArea = document.getElementById('commentsArea');
+  const testXssBtn = document.getElementById('testXssBtn');
+  const xssTestResult = document.getElementById('xssTestResult');
+
+  let storedComments = [];
+
+  postCommentBtn.addEventListener('click', () => {
+    const comment = commentInput.value.trim();
+    if (!comment) return alert("Write a comment first.");
+    // Vulnerability: Directly inject comment HTML into page (stored XSS)
+    storedComments.push(comment);
+    renderComments();
+    commentInput.value = '';
+  });
+
+  function renderComments() {
+    // Vulnerable rendering: innerHTML without sanitization
+    commentsArea.innerHTML = storedComments.map(c => `<div style="border-bottom:1px solid #ddd; padding:5px;">${c}</div>`).join('');
+  }
+
+  // Test Stored XSS by posting an XSS payload and checking if alert is triggered
+  testXssBtn.addEventListener('click', () => {
+    xssTestResult.textContent = 'Running Stored XSS Test...';
+
+    // To detect alert call override window.alert temporarily to detect execution
+    let alertTriggered = false;
+    const originalAlert = window.alert;
+    window.alert = function(msg) {
+      alertTriggered = true;
+      xssTestResult.textContent += `Alert triggered with message: "${msg}"\nStored XSS vulnerability detected!`;
+    };
+
+    // Post a stored XSS payload
+    const xssPayload = `<img src="x" onerror="alert('XSS')">`;
+    storedComments.push(xssPayload);
+    renderComments();
+
+    // After short delay check if alert was triggered
+    setTimeout(() => {
+      if (!alertTriggered) {
+        xssTestResult.textContent += 'No Stored XSS vulnerability detected.';
+      }
+      // Restore original alert
+      window.alert = originalAlert;
+    }, 1500);
+  });
+
+
+  // === Section 3: Authentication Flaw Demo ===
+  const loginBtn = document.getElementById('loginBtn');
+  const usernameInput = document.getElementById('usernameInput');
+  const passwordInput = document.getElementById('passwordInput');
+  const loginStatus = document.getElementById('loginStatus');
+  const testAuthBtn = document.getElementById('testAuthBtn');
+  const authTestResult = document.getElementById('authTestResult');
+
+  // Hardcoded user credentials - weak password demo
+  const USER_DATA = {
+    'admin': '1234' // Weak hardcoded password
+  };
+
+  // State: number of failed attempts per username (no lockout implemented)
+  let failedAttempts = {};
+
+  loginBtn.addEventListener('click', () => {
+    const user = usernameInput.value.trim();
+    const pass = passwordInput.value;
+
+    if (!user || !pass) {
+      loginStatus.textContent = 'Please enter username and password.';
+      return;
+    }
+
+    if (USER_DATA[user] && USER_DATA[user] === pass) {
+      loginStatus.style.color = 'green';
+      loginStatus.textContent = 'Login successful!';
+      failedAttempts[user] = 0;
+    } else {
+      failedAttempts[user] = (failedAttempts[user] || 0) + 1;
+      loginStatus.style.color = 'red';
+      loginStatus.textContent = `Login failed. Attempt ${failedAttempts[user]}.`;
+    }
+  });
+
+  // Test authentication flaw: brute force test simulation (no lockout or throttling)
+  testAuthBtn.addEventListener('click', () => {
+    authTestResult.textContent = 'Running Authentication Flaw Test...\n';
+
+    const testUser = 'admin';
+    const weakPasswords = ['1234', 'password', 'admin', 'letmein'];
+
+    let flawed = false;
+
+    for (let i = 0; i < weakPasswords.length; i++) {
+      const pw = weakPasswords[i];
+      if (USER_DATA[testUser] === pw) {
+        flawed = true;
+        authTestResult.textContent += `Weak password detected for user '${testUser}': '${pw}'\n`;
+      }
+    }
+
+    // Test brute force by simulating multiple failed attempts with no lockout
+    const initialCount = failedAttempts[testUser] || 0;
+    let attempts = 10;
+    for (let i = 0; i < attempts; i++) {
+      // Always wrong password
+      if (USER_DATA[testUser] === 'wrongpass') {
+        // hypothetically impossible
+      } else {
+        failedAttempts[testUser] = (failedAttempts[testUser] || 0) + 1;
+      }
+    }
+    let newCount = failedAttempts[testUser];
+    if (newCount - initialCount === attempts) {
+      flawed = true;
+      authTestResult.textContent += `No account lockout detected: Allowed ${attempts} failed login attempts in a row.\n`;
+    }
+
+    if (!flawed) {
+      authTestResult.textContent += 'No obvious authentication flaws detected with tested scenarios.';
+    }
+  });
+</script>
+
+</body>
+</html>
